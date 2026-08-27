@@ -860,7 +860,7 @@
         var originals = Array.prototype.slice.call(col.children);
         // kafle rozciagane przez flex-grow trzeba zamrozic na ich obecnej wysokosci,
         // bo w nieograniczonej sciezce zapadlyby sie do zera
-        var heights = originals.map(function (c) { return c.getBoundingClientRect().height; });
+        var heights = originals.map(function (c) { return c.offsetHeight; });
         originals.forEach(function (c, i) {
           if (parseFloat(getComputedStyle(c).flexGrow) > 0 && heights[i] > 0) {
             c.style.height = heights[i] + 'px';
@@ -877,7 +877,7 @@
 
         // krotka kolumna dostaje powtorzone kafle, zeby petla nigdy nie odslonila dziury
         var guard = 0;
-        while (track.getBoundingClientRect().height < colH + 8 && guard++ < 6) {
+        while (track.offsetHeight < colH + 8 && guard++ < 6) {
           originals.forEach(function (c) {
             var cp = c.cloneNode(true);
             cp.setAttribute('aria-hidden', 'true');
@@ -889,7 +889,9 @@
         clone.setAttribute('aria-hidden', 'true');
         outer.appendChild(clone);
 
-        var span = track.getBoundingClientRect().height + gap;
+        // offsetHeight, nie getBoundingClientRect: pod CSS zoom rect zwraca
+        // przeskalowane piksele, a przesuwamy w nieprzeskalowanej przestrzeni elementu
+        var span = track.offsetHeight + gap;
         if (span < 40) return;
 
         var dir = (ci === 1) ? -1 : 1;    // srodkowa kolumna plynie pod prad
@@ -912,7 +914,7 @@
         vis.observe(col);
 
         addEventListener('resize', function () {
-          m.span = track.getBoundingClientRect().height + gap;
+          m.span = track.offsetHeight + gap;
         }, { passive: true });
       });
     });
