@@ -706,15 +706,17 @@
   }
 
   /* ---- sztywny canvas dopasowany do szerokosci okna ----
-     Makieta ma stala szerokosc (A: 924 px, C: 1442 px). Zamiast ucinac
-     zawartosc na weszym ekranie, skalujemy cala kompozycje przez zoom
-     (w odroznieniu od transform zachowuje uklad, wysokosc i sticky). */
+     Makieta ma stala szerokosc (A: 924 px, C: 1442 px). Skalujemy ja przez
+     CSS zoom — w odroznieniu od transform zachowuje uklad, wysokosc dokumentu
+     i sticky. Na szerokim ekranie powiekszamy, na waskim zmniejszamy, a to,
+     co zostanie po bokach, wysrodkowujemy. */
   function fitCanvas() {
     var canvasW = parseFloat(root.style.width);
-    if (!canvasW || !window.CSS || !CSS.supports || !CSS.supports('zoom', '1')) return;
+    if (!canvasW) return;
+    root.style.marginLeft = 'auto';
+    root.style.marginRight = 'auto';
     function apply() {
       var z = plannedZoom();
-      // ponizej ~60% makieta robi sie nieczytelna — plannedZoom zwraca wtedy 1
       root.style.zoom = z === 1 ? '' : z;
     }
     apply();
@@ -848,12 +850,15 @@
      bezszwowa petle. Zatrzymuje sie pod kursorem i na czas scrollowania. */
   var marquees = [];
 
-  /** skala, ktora fitCanvas naloz~y na makiete — potrzebna do przeliczenia 100% wysokosci okna */
+  /** skala, ktora fitCanvas nalozy na makiete — wspolna dla pomiarow i renderu */
+  var ZOOM_MIN = 0.5;   // ponizej makieta jest nieczytelna — zostaje przewijanie
+  var ZOOM_MAX = 1.5;   // powyzej robi sie karykatura zamiast makiety
   function plannedZoom() {
     var canvasW = parseFloat(root.style.width);
     if (!canvasW || !window.CSS || !CSS.supports || !CSS.supports('zoom', '1')) return 1;
-    var z = Math.min(1, document.documentElement.clientWidth / canvasW);
-    return z < 0.6 ? 1 : z;   // ponizej 0.6 fitCanvas rezygnuje ze skalowania
+    var z = document.documentElement.clientWidth / canvasW;
+    if (z < ZOOM_MIN) return 1;
+    return Math.min(z, ZOOM_MAX);
   }
 
   function setupMarquee() {
