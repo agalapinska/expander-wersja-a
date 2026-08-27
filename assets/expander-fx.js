@@ -835,6 +835,15 @@
     });
   }
 
+  /** klon dla petli: ukryty przed czytnikami, wiec nie moze byc fokusowalny */
+  function makeLoopClone(node) {
+    var cp = node.cloneNode(true);
+    cp.setAttribute('aria-hidden', 'true');
+    $$('[tabindex]', cp).forEach(function (e) { e.removeAttribute('tabindex'); });
+    cp.removeAttribute('tabindex');
+    return cp;
+  }
+
   /* ---- kolumny kafli, ktore powoli plyna w dol ----
      Kolumna z overflow:hidden i trescia wyzsza niz ramka dostaje
      bezszwowa petle. Zatrzymuje sie pod kursorem i na czas scrollowania. */
@@ -878,16 +887,10 @@
         // krotka kolumna dostaje powtorzone kafle, zeby petla nigdy nie odslonila dziury
         var guard = 0;
         while (track.offsetHeight < colH + 8 && guard++ < 6) {
-          originals.forEach(function (c) {
-            var cp = c.cloneNode(true);
-            cp.setAttribute('aria-hidden', 'true');
-            track.appendChild(cp);
-          });
+          originals.forEach(function (c) { track.appendChild(makeLoopClone(c)); });
         }
 
-        var clone = track.cloneNode(true);
-        clone.setAttribute('aria-hidden', 'true');
-        outer.appendChild(clone);
+        outer.appendChild(makeLoopClone(track));
 
         // offsetHeight, nie getBoundingClientRect: pod CSS zoom rect zwraca
         // przeskalowane piksele, a przesuwamy w nieprzeskalowanej przestrzeni elementu
