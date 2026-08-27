@@ -713,10 +713,9 @@
     var canvasW = parseFloat(root.style.width);
     if (!canvasW || !window.CSS || !CSS.supports || !CSS.supports('zoom', '1')) return;
     function apply() {
-      var vw = document.documentElement.clientWidth;
-      var z = Math.min(1, vw / canvasW);
-      // ponizej ~60% makieta robi sie nieczytelna — wtedy lepsze jest przewijanie
-      root.style.zoom = z < 0.6 ? '' : z;
+      var z = plannedZoom();
+      // ponizej ~60% makieta robi sie nieczytelna — plannedZoom zwraca wtedy 1
+      root.style.zoom = z === 1 ? '' : z;
     }
     apply();
     addEventListener('resize', apply, { passive: true });
@@ -848,6 +847,15 @@
      Kolumna z overflow:hidden i trescia wyzsza niz ramka dostaje
      bezszwowa petle. Zatrzymuje sie pod kursorem i na czas scrollowania. */
   var marquees = [];
+
+  /** skala, ktora fitCanvas naloz~y na makiete — potrzebna do przeliczenia 100% wysokosci okna */
+  function plannedZoom() {
+    var canvasW = parseFloat(root.style.width);
+    if (!canvasW || !window.CSS || !CSS.supports || !CSS.supports('zoom', '1')) return 1;
+    var z = Math.min(1, document.documentElement.clientWidth / canvasW);
+    return z < 0.6 ? 1 : z;   // ponizej 0.6 fitCanvas rezygnuje ze skalowania
+  }
+
   function setupMarquee() {
     if (RM) return;
     ALL.forEach(function (row) {
@@ -860,40 +868,54 @@
       });
       if (cols.length < 2) return;
 
+      // wspolna pula kafli ze wszystkich kolumn — dzieki niej dobudowa
+      // nie powtarza w kolko tych samych trzech zdjec
+      var pool = [];
+      cols.forEach(function (c) { pool = pool.concat(Array.prototype.slice.call(c.children)); });
+      // kafle rozciagane przez flex-grow zamrazamy, zanim ruszymy je z miejsca
+      var heights = pool.map(function (c) { return c.offsetHeight; });
+      pool.forEach(function (c, i) {
+        if (parseFloat(getComputedStyle(c).flexGrow) > 0 && heights[i] > 0) {
+          c.style.height = heights[i] + 'px';
+          c.style.flex = '0 0 auto';
+        }
+      });
+
+      // sciana ma wypelnic ekran, a nie zostawiac bieli nad i pod soba
+      var baseH = cols[0].offsetHeight || 549;
+      function targetH() {
+        return Math.max(baseH, Math.round(innerHeight / plannedZoom()));
+      }
+
       cols.forEach(function (col, ci) {
         var gap = parseFloat(getComputedStyle(col).rowGap) || 12;
-        var colH = col.clientHeight;
+        var own = Array.prototype.slice.call(col.children);
+        var target = targetH();
+        col.style.height = target + 'px';
 
         var track = document.createElement('div');
         track.style.cssText = 'display:flex;flex-direction:column;flex-shrink:0;gap:' + gap + 'px';
-        var originals = Array.prototype.slice.call(col.children);
-        // kafle rozciagane przez flex-grow trzeba zamrozic na ich obecnej wysokosci,
-        // bo w nieograniczonej sciezce zapadlyby sie do zera
-        var heights = originals.map(function (c) { return c.offsetHeight; });
-        originals.forEach(function (c, i) {
-          if (parseFloat(getComputedStyle(c).flexGrow) > 0 && heights[i] > 0) {
-            c.style.height = heights[i] + 'px';
-            c.style.flex = '0 0 auto';
-          }
-          track.appendChild(c);
-        });
+        own.forEach(function (c) { track.appendChild(c); });
 
         var outer = document.createElement('div');
         outer.className = 'fx-marquee';
         outer.style.cssText = 'display:flex;flex-direction:column;flex-shrink:0;gap:' + gap + 'px;will-change:transform';
         outer.appendChild(track);
-        col.appendChild(outer);   // najpierw do DOM, inaczej pomiar wysokosci zwraca zero
+        col.appendChild(outer);   // do DOM przed pomiarem, inaczej wysokosc to zero
 
-        // krotka kolumna dostaje powtorzone kafle, zeby petla nigdy nie odslonila dziury
-        var guard = 0;
-        while (track.offsetHeight < colH + 8 && guard++ < 6) {
-          originals.forEach(function (c) { track.appendChild(makeLoopClone(c)); });
+        // dobudowa z puli, kazda kolumna zaczyna od innego miejsca
+        var k = ci * 3;
+        function topUp(h) {
+          var guard = 0;
+          while (track.offsetHeight < h + 8 && guard++ < 60) {
+            track.appendChild(makeLoopClone(pool[k++ % pool.length]));
+          }
         }
+        topUp(target);
 
-        outer.appendChild(makeLoopClone(track));
+        var clone = makeLoopClone(track);
+        outer.appendChild(clone);
 
-        // offsetHeight, nie getBoundingClientRect: pod CSS zoom rect zwraca
-        // przeskalowane piksele, a przesuwamy w nieprzeskalowanej przestrzeni elementu
         var span = track.offsetHeight + gap;
         if (span < 40) return;
 
@@ -902,7 +924,7 @@
           outer: outer, span: span, dir: dir,
           y: dir > 0 ? -span : 0,
           speed: 18,                      // ta sama predkosc w kazdej kolumnie
-          hover: false, visible: true, scrolling: 0  // obserwator moze tylko wylaczyc ruch poza ekranem
+          hover: false, visible: true, scrolling: 0
         };
         marquees.push(m);
 
@@ -916,8 +938,18 @@
         }, { threshold: 0 });
         vis.observe(col);
 
+        var rz;
         addEventListener('resize', function () {
-          m.span = track.offsetHeight + gap;
+          clearTimeout(rz);
+          rz = setTimeout(function () {
+            var t = targetH();
+            col.style.height = t + 'px';
+            topUp(t);                      // wyzsze okno = dokladamy kafli
+            outer.replaceChild(makeLoopClone(track), clone);
+            clone = outer.lastElementChild;
+            m.span = track.offsetHeight + gap;
+            if (m.y < -m.span) m.y = -m.span;
+          }, 160);
         }, { passive: true });
       });
     });
