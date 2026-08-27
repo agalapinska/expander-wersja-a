@@ -858,11 +858,26 @@
         var track = document.createElement('div');
         track.style.cssText = 'display:flex;flex-direction:column;flex-shrink:0;gap:' + gap + 'px';
         var originals = Array.prototype.slice.call(col.children);
-        originals.forEach(function (c) { track.appendChild(c); });
+        // kafle rozciagane przez flex-grow trzeba zamrozic na ich obecnej wysokosci,
+        // bo w nieograniczonej sciezce zapadlyby sie do zera
+        var heights = originals.map(function (c) { return c.getBoundingClientRect().height; });
+        originals.forEach(function (c, i) {
+          if (parseFloat(getComputedStyle(c).flexGrow) > 0 && heights[i] > 0) {
+            c.style.height = heights[i] + 'px';
+            c.style.flex = '0 0 auto';
+          }
+          track.appendChild(c);
+        });
+
+        var outer = document.createElement('div');
+        outer.className = 'fx-marquee';
+        outer.style.cssText = 'display:flex;flex-direction:column;flex-shrink:0;gap:' + gap + 'px;will-change:transform';
+        outer.appendChild(track);
+        col.appendChild(outer);   // najpierw do DOM, inaczej pomiar wysokosci zwraca zero
 
         // krotka kolumna dostaje powtorzone kafle, zeby petla nigdy nie odslonila dziury
         var guard = 0;
-        while (track.getBoundingClientRect().height + gap < colH + gap + 8 && guard++ < 6) {
+        while (track.getBoundingClientRect().height < colH + 8 && guard++ < 6) {
           originals.forEach(function (c) {
             var cp = c.cloneNode(true);
             cp.setAttribute('aria-hidden', 'true');
@@ -870,15 +885,9 @@
           });
         }
 
-        var outer = document.createElement('div');
-        outer.className = 'fx-marquee';
-        outer.style.cssText = 'display:flex;flex-direction:column;flex-shrink:0;gap:' + gap + 'px;will-change:transform';
-        outer.appendChild(track);
-
         var clone = track.cloneNode(true);
         clone.setAttribute('aria-hidden', 'true');
         outer.appendChild(clone);
-        col.appendChild(outer);
 
         var span = track.getBoundingClientRect().height + gap;
         if (span < 40) return;
@@ -888,7 +897,7 @@
           outer: outer, span: span, dir: dir,
           y: dir > 0 ? -span : 0,
           speed: 18,                      // ta sama predkosc w kazdej kolumnie
-          hover: false, visible: false, scrolling: 0
+          hover: false, visible: true, scrolling: 0  // obserwator moze tylko wylaczyc ruch poza ekranem
         };
         marquees.push(m);
 
@@ -927,8 +936,10 @@
       marquees.forEach(function (m) {
         if (m.hover || m.scrolling || !m.visible) return;
         m.y += m.dir * m.speed * dt;
-        if (m.y >= 0) m.y -= m.span;
-        else if (m.y <= -m.span) m.y += m.span;
+        // zawijamy tylko po stronie zgodnej z kierunkiem — inaczej oba warunki
+        // wyzwalaja sie na przemian i kolumna stoi w miejscu
+        if (m.dir > 0) { if (m.y >= 0) m.y -= m.span; }
+        else if (m.y <= -m.span) { m.y += m.span; }
         m.outer.style.transform = 'translate3d(0,' + m.y.toFixed(2) + 'px,0)';
       });
       requestAnimationFrame(tick);
