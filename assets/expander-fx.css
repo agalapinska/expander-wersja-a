@@ -1,0 +1,252 @@
+/* ============================================================
+   EXPANDER — warstwa animacji i interakcji dla eksportów Pencil
+   Nakładka: nie zmienia layoutu, dodaje ruch, stany i sterowanie.
+   ============================================================ */
+
+:root{
+  --fx-ease: cubic-bezier(.16,1,.3,1);
+  --fx-red: #e22128;
+  --fx-shadow-sm: 0 2px 8px rgba(20,20,20,.08);
+  --fx-shadow-md: 0 10px 28px -8px rgba(20,20,20,.22);
+  --fx-shadow-lg: 0 24px 60px -18px rgba(20,20,20,.35);
+}
+
+html{ scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce){ html{ scroll-behavior: auto; } }
+
+/* ---------- 1. Wejście strony ---------- */
+/* strona odsłania się po starcie skryptu; bezpiecznik pokazuje ją także,
+   gdy skrypt nie wystartuje */
+body{ opacity: 0; animation: fx-failsafe 0s linear 1.6s forwards; }
+body.fx-ready{ opacity: 1; transition: opacity .5s ease; animation: none; }
+@keyframes fx-failsafe{ to{ opacity: 1; } }
+
+/* ---------- 2. Reveal przy scrollu ---------- */
+.fx-rv{
+  opacity: 0;
+  transform: translate3d(0, var(--fx-rv-y, 22px), 0);
+  will-change: opacity, transform;
+}
+.fx-rv.fx-in{
+  opacity: 1;
+  transform: none;
+  transition: opacity .75s var(--fx-ease) var(--fx-d, 0ms),
+              transform .75s var(--fx-ease) var(--fx-d, 0ms);
+}
+
+/* ---------- 3. Nagłówek przyklejony ---------- */
+.fx-sticky{
+  position: sticky !important;
+  top: 0;
+  z-index: 60;
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  transition: box-shadow .3s ease, transform .35s var(--fx-ease);
+}
+.fx-sticky.fx-scrolled{ box-shadow: 0 1px 0 rgba(20,20,20,.08), 0 8px 24px -14px rgba(20,20,20,.35); }
+.fx-sticky.fx-hidden{ transform: translateY(-102%); }
+
+/* pasek postępu czytania */
+#fx-progress{
+  position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+  background: linear-gradient(90deg, var(--fx-red), #ff6b70);
+  z-index: 200; pointer-events: none;
+  transition: width .12s linear, opacity .3s;
+}
+
+/* ---------- 4. Interaktywne elementy ---------- */
+.fx-btn{
+  cursor: pointer;
+  transition: transform .22s var(--fx-ease), box-shadow .22s var(--fx-ease), filter .22s ease;
+  position: relative;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+.fx-btn:hover{ transform: translateY(-2px); box-shadow: var(--fx-shadow-md); filter: brightness(1.06); }
+.fx-btn:active{ transform: translateY(0) scale(.985); box-shadow: var(--fx-shadow-sm); }
+
+/* fala po kliknięciu */
+.fx-ripple{
+  position: absolute; border-radius: 50%; pointer-events: none;
+  background: currentColor; opacity: .28;
+  transform: translate(-50%,-50%) scale(0);
+  animation: fx-ripple .6s var(--fx-ease) forwards;
+}
+@keyframes fx-ripple{ to{ transform: translate(-50%,-50%) scale(1); opacity: 0; } }
+
+.fx-card{
+  cursor: pointer;
+  transition: transform .3s var(--fx-ease), box-shadow .3s var(--fx-ease);
+}
+.fx-card:hover{ transform: translateY(-5px); box-shadow: var(--fx-shadow-md); }
+
+.fx-photo{ overflow: hidden; }
+.fx-photo .fx-photo-inner,
+.fx-photo.fx-photo-self{ transition: transform .7s var(--fx-ease); }
+.fx-card:hover .fx-photo-inner,
+.fx-photo.fx-photo-self:hover{ transform: scale(1.05); }
+
+.fx-link{
+  cursor: pointer; position: relative;
+  transition: color .2s ease, opacity .2s ease;
+}
+.fx-link::after{
+  content: ""; position: absolute; left: 0; right: 0; bottom: -3px; height: 1.5px;
+  background: currentColor; transform: scaleX(0); transform-origin: right;
+  transition: transform .3s var(--fx-ease);
+}
+.fx-link:hover::after{ transform: scaleX(1); transform-origin: left; }
+.fx-link:hover{ color: var(--fx-red); }
+
+.fx-chip{ cursor: pointer; transition: transform .2s var(--fx-ease), box-shadow .2s, filter .2s; }
+.fx-chip:hover{ transform: translateY(-2px); box-shadow: var(--fx-shadow-sm); }
+.fx-chip.fx-on{ box-shadow: inset 0 0 0 2px var(--fx-red); }
+
+/* fokus klawiaturowy */
+.fx-btn:focus-visible, .fx-card:focus-visible, .fx-link:focus-visible,
+.fx-chip:focus-visible, .fx-acc-sum:focus-visible{
+  outline: 2px solid var(--fx-red); outline-offset: 3px; border-radius: 6px;
+}
+
+/* ---------- 5. Suwaki kalkulatora ---------- */
+.fx-slider-host{ position: relative; }
+.fx-range{
+  position: absolute; left: 0; width: 100%; height: 30px; margin: 0;
+  opacity: 0; cursor: grab; z-index: 6; -webkit-appearance: none; appearance: none; background: none;
+}
+.fx-range:active{ cursor: grabbing; }
+.fx-range::-webkit-slider-thumb{ -webkit-appearance: none; width: 30px; height: 30px; }
+.fx-track{ transition: background-image .12s linear; }
+.fx-thumb{
+  transition: transform .18s var(--fx-ease), box-shadow .18s var(--fx-ease);
+  pointer-events: none;
+}
+.fx-slider-host:hover .fx-thumb{ transform: scale(1.18); box-shadow: 0 0 0 6px rgba(226,33,40,.14); }
+.fx-slider-host.fx-drag .fx-thumb{ transform: scale(1.3); box-shadow: 0 0 0 10px rgba(226,33,40,.18); }
+
+.fx-num-flash{ animation: fx-flash .5s var(--fx-ease); }
+@keyframes fx-flash{ 0%{ opacity:.35; transform: translateY(-3px);} 100%{ opacity:1; transform:none;} }
+
+/* ---------- 6. Akordeony ---------- */
+.fx-acc-sum{ cursor: pointer; user-select: none; transition: color .2s ease; }
+.fx-acc-sum:hover{ color: var(--fx-red) !important; }
+.fx-acc-body{
+  overflow: hidden;
+  transition: height .4s var(--fx-ease), opacity .3s ease;
+}
+.fx-acc-body[data-open="0"]{ height: 0 !important; opacity: 0; }
+
+/* ---------- 7. Realne pola formularza ---------- */
+.fx-input{
+  all: unset; box-sizing: border-box; width: 100%; display: block;
+  font: inherit; color: #141414; cursor: text;
+}
+.fx-input::placeholder{ color: #9a9a9a; }
+.fx-field{ transition: border-color .2s ease, box-shadow .2s ease; }
+.fx-field.fx-focus{ border-color: var(--fx-red) !important; box-shadow: 0 0 0 3px rgba(226,33,40,.12); }
+.fx-field.fx-invalid{ border-color: #d33 !important; box-shadow: 0 0 0 3px rgba(211,51,51,.12); }
+.fx-err{ color: #d33; font-size: 12px; margin-top: 4px; }
+
+/* ---------- 8. Toast ---------- */
+#fx-toast{
+  position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 20px);
+  background: #141414; color: #fff; padding: 13px 20px; border-radius: 12px;
+  font: 500 14px/1.4 Inter, system-ui, sans-serif; z-index: 300;
+  box-shadow: var(--fx-shadow-lg); opacity: 0; pointer-events: none; max-width: 90vw;
+  transition: opacity .3s ease, transform .35s var(--fx-ease);
+}
+#fx-toast.fx-on{ opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- 9. Powrót na górę ---------- */
+#fx-top{
+  position: fixed; right: 22px; bottom: 22px; width: 46px; height: 46px;
+  border-radius: 50%; border: 1px solid rgba(20,20,20,.1); background: #fff; color: #141414;
+  display: grid; place-items: center; cursor: pointer; z-index: 110;
+  box-shadow: var(--fx-shadow-md); opacity: 0; transform: translateY(14px) scale(.9);
+  pointer-events: none; transition: all .35s var(--fx-ease);
+}
+#fx-top.fx-on{ opacity: 1; transform: none; pointer-events: auto; }
+#fx-top:hover{ transform: translateY(-3px); }
+body.fx-has-chat #fx-top{ bottom: 94px; }
+
+/* ---------- 10. Marquee / przewijane rzędy ---------- */
+.fx-scroller{
+  overflow-x: auto; scroll-behavior: smooth; scrollbar-width: none;
+  cursor: grab; -webkit-overflow-scrolling: touch;
+}
+.fx-scroller::-webkit-scrollbar{ display: none; }
+.fx-scroller.fx-dragging{ cursor: grabbing; scroll-behavior: auto; }
+.fx-scroller > *{ scroll-snap-align: start; }
+
+/* ---------- 11. Licznik / puls ---------- */
+.fx-pulse{ animation: fx-pulse 2.6s ease-in-out infinite; }
+@keyframes fx-pulse{ 0%,100%{ opacity: 1; } 50%{ opacity: .45; } }
+
+/* ---------- 12. Szacunek dla ustawień systemu ---------- */
+@media (prefers-reduced-motion: reduce){
+  .fx-rv{ opacity: 1 !important; transform: none !important; }
+  .fx-btn:hover, .fx-card:hover{ transform: none; }
+  .fx-pulse{ animation: none; }
+  *{ animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* ---------- 13. Lista wyboru ---------- */
+.fx-select{
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1.5 6 6.5l5-5' fill='none' stroke='%23757575' stroke-width='1.8' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat; background-position: right 14px center;
+  padding-right: 34px !important;
+}
+
+/* ---------- 14. Karty nieruchomości: panel na hover ---------- */
+.fx-prop-host{ cursor: pointer; }
+.fx-prop-orig{ transition: opacity .3s ease, transform .45s var(--fx-ease); }
+.fx-prop-host:hover .fx-prop-orig{ opacity: 0; transform: translateY(-8px); }
+
+.fx-prop{
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+  padding: 22px 22px 20px;
+  background: linear-gradient(0deg, rgba(8,11,18,.96) 55%, rgba(8,11,18,.72) 80%, rgba(8,11,18,0) 100%);
+  color: #fff; font-family: Inter, system-ui, sans-serif;
+  transform: translateY(101%);
+  transition: transform .45s var(--fx-ease);
+  pointer-events: none;
+}
+.fx-prop-host:hover .fx-prop,
+.fx-prop-host:focus-visible .fx-prop{ transform: translateY(0); }
+
+.fx-prop-kind{
+  display: inline-block; font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+  background: var(--fx-red); color: #fff; padding: 5px 10px; border-radius: 999px;
+  margin-bottom: 12px;
+}
+.fx-prop-title{ font-size: 23px; font-weight: 600; letter-spacing: -.4px; line-height: 1.15; }
+.fx-prop-place{ font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; color: #c9cdd4; margin-top: 5px; }
+.fx-prop-grid{
+  display: flex; gap: 28px; margin-top: 16px;
+  border-top: 1px solid rgba(255,255,255,.18); padding-top: 14px;
+}
+.fx-prop-grid b{ display: block; font-size: 20px; font-weight: 600; letter-spacing: -.3px; }
+.fx-prop-grid span{
+  display: block; font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: #9aa3b0; margin-top: 3px;
+}
+
+/* etykieta przy kursorze */
+#fx-cursor{
+  position: fixed; z-index: 250; pointer-events: none;
+  background: #fff; color: #0e1420; border-radius: 999px;
+  padding: 9px 16px; font: 600 12.5px Inter, system-ui, sans-serif;
+  box-shadow: 0 12px 30px -10px rgba(8,11,18,.55);
+  opacity: 0; transform: translate(-50%, -50%) scale(.8);
+  transition: opacity .2s ease, transform .25s var(--fx-ease);
+  white-space: nowrap;
+}
+#fx-cursor.fx-on{ opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+@media (prefers-reduced-motion: reduce){
+  .fx-prop{ transform: none; opacity: 0; transition: opacity .2s; }
+  .fx-prop-host:hover .fx-prop{ opacity: 1; }
+  #fx-cursor{ display: none; }
+}
