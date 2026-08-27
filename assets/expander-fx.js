@@ -103,7 +103,7 @@
   }, { threshold: 0.08, rootMargin: '0px 0px -6% 0px' });
 
   function reveal(el, delay, dist) {
-    if (!el || el.classList.contains('fx-rv')) return;
+    if (!el || el.__fxNoReveal || el.classList.contains('fx-rv')) return;
     el.classList.add('fx-rv');
     if (delay) el.style.setProperty('--fx-d', delay + 'ms');
     if (dist != null) el.style.setProperty('--fx-rv-y', dist + 'px');
@@ -116,7 +116,7 @@
       // pierwszy ekran pokazujemy od razu — bez migotania nad zakładką
       if (sec.getBoundingClientRect().top < innerHeight * 0.9) {
         // hero: delikatne wejście z opóźnieniem, ale bez czekania na scroll
-        var kids0 = revealUnits(sec);
+        var kids0 = revealUnits(sec).filter(function (k) { return !k.__fxNoReveal; });
         kids0.forEach(function (k, i) {
           k.classList.add('fx-rv');
           k.style.setProperty('--fx-d', (80 + i * 90) + 'ms');
@@ -868,6 +868,18 @@
       });
       if (cols.length < 2) return;
 
+      // sciana ofert ma byc widoczna od razu po zaladowaniu, wiec nie bierze
+      // udzialu w reveal-u przy scrollu (inaczej sekcja swieci bielą)
+      row.__fxNoReveal = true;
+      row.classList.remove('fx-rv');
+      row.classList.add('fx-in');
+      var up = row.parentElement, lvl = 0;
+      while (up && lvl++ < 3) {
+        up.__fxNoReveal = true;
+        up.classList.remove('fx-rv');
+        up = up.parentElement;
+      }
+
       // wspolna pula kafli ze wszystkich kolumn — dzieki niej dobudowa
       // nie powtarza w kolko tych samych trzech zdjec
       var pool = [];
@@ -1071,9 +1083,9 @@
     try { fitRows(); } catch (e) { console.warn('fx fitRows', e); }
     try { setupScrollers(); } catch (e) { console.warn('fx scrollers', e); }
     try { setupBars(); } catch (e) { console.warn('fx bars', e); }
-    try { setupReveals(); } catch (e) { console.warn('fx reveals', e); }
     try { setupPropertyCards(); } catch (e) { console.warn('fx property', e); }
     try { setupMarquee(); } catch (e) { console.warn('fx marquee', e); }
+    try { setupReveals(); } catch (e) { console.warn('fx reveals', e); }
     try { setupTop(); } catch (e) { console.warn('fx top', e); }
     // gdyby IntersectionObserver nie zadziałał (karta w tle, stara przeglądarka),
     // paski porównania i tak muszą się pojawić — inaczej kolumna zostaje pusta
